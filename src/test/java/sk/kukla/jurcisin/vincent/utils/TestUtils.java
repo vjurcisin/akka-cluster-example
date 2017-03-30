@@ -27,29 +27,38 @@ import sk.kukla.jurcisin.vincent.management.ClusterState;
 public class TestUtils {
 
     private static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
-    private static int killedClusterMemberOrdinal;
+    private static int stoppedMemberOrdinal;
 
     protected static Map<Integer, ClusterObjectWrapper> CLUSTER_OBJECTS = new ConcurrentHashMap<>();
 
     public static void startCluster() {
         LOG.info("starting cluster ...");
         String address;
-        int port;
         for (int i=1; i<=3; i++) {
-            port = 2550 + i;
-            // Override the configuration of the port
-            Config config = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port)
-                    .withFallback(ConfigFactory.load());
-
-            // Create an Akka system
-            ActorSystem actorSystem = ActorSystem.create("ClusterSystem", config);
-
-            // Create ClusterState and ClusterGovernor
-            ClusterState clusterState = new ClusterState(actorSystem);
-            actorSystem.actorOf(ClusterStateActor.props(clusterState));
-            CLUSTER_OBJECTS.put(i, new ClusterObjectWrapper(i, actorSystem, clusterState));
+            initMember(i);
+        }
+        try {
+            Thread.sleep(5000l);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
         waitForLeaders(1, 15);
+    }
+
+    private static void initMember(int ordinal) {
+        int port;
+        port = 2550 + ordinal;
+        // Override the configuration of the port
+        Config config = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port)
+                .withFallback(ConfigFactory.load());
+
+        // Create an Akka system
+        ActorSystem actorSystem = ActorSystem.create("ClusterSystem", config);
+
+        // Create ClusterState and ClusterGovernor
+        ClusterState clusterState = new ClusterState(actorSystem);
+        actorSystem.actorOf(ClusterStateActor.props(clusterState));
+        CLUSTER_OBJECTS.put(ordinal, new ClusterObjectWrapper(ordinal, actorSystem, clusterState));
     }
 
     public static void stopCluster() {
@@ -84,17 +93,7 @@ public class TestUtils {
         return leadersCount;
     }
 
-    public static void shutdownActorSystem(int ordinal) {
-        ClusterObjectWrapper objectWrapper = CLUSTER_OBJECTS.get(ordinal);
-        Preconditions.checkNotNull(objectWrapper, "missing cluster object wrapper for ordinal "+ordinal);
-        ActorSystem actorSystem = objectWrapper.getActorSystem();
-        actorSystem.shutdown();
-        Awaitility.await()
-                .atMost(15, TimeUnit.SECONDS)
-                .until(actorSystem::isTerminated);
-    }
-
-    public static void shutdownLeaderMember() {
+    public static void stopLeaderMember() {
         int leaderOrdinal = 0;
         for (ClusterObjectWrapper objectWrapper : CLUSTER_OBJECTS.values()) {
             if (objectWrapper.getClusterState().isLeader()) {
@@ -103,13 +102,13 @@ public class TestUtils {
             }
         }
         Assert.assertNotEquals("no leader was found", 0, leaderOrdinal);
-        killedClusterMemberOrdinal = leaderOrdinal;
+        stoppedMemberOrdinal = leaderOrdinal;
         CLUSTER_OBJECTS.get(leaderOrdinal).getClusterState().setLeader(false);
         shutdownActorSystem(leaderOrdinal);
         LOG.info("[cluster] shutdowned cluster member = {}", leaderOrdinal);
     }
 
-    public static void shutdownNonLeaderMember() {
+    public static void stopNonLeaderMember() {
         int nonLeaderOrdinal = 0;
         for (ClusterObjectWrapper objectWrapper : CLUSTER_OBJECTS.values()) {
             if (!objectWrapper.getClusterState().isLeader()) {
@@ -118,13 +117,21 @@ public class TestUtils {
             }
         }
         Assert.assertNotEquals("no nonleader was found", 0, nonLeaderOrdinal);
-        killedClusterMemberOrdinal = nonLeaderOrdinal;
+        stoppedMemberOrdinal = nonLeaderOrdinal;
         shutdownActorSystem(nonLeaderOrdinal);
         LOG.info("[cluster] shutdowned cluster member = {}", nonLeaderOrdinal);
     }
 
-    public static void startupShutdownedMember(int ordinal) {
-        throw new UnsupportedOperationException();
+    public static void leaderIsDifferentThenKilled() {
+        if (currentLeader().isPresent()) {
+            Assert.assertNotEquals(stoppedMemberOrdinal, currentLeader().get().getOrdinal());
+        } else {
+            Assert.fail("doesn't exist leader");
+        }
+    }
+
+    public static void startupStoppedMember() {
+        initMember(stoppedMemberOrdinal);
     }
 
     private static void startupActorSystem(ActorSystem actorSystem) {
@@ -138,11 +145,13 @@ public class TestUtils {
         return first;
     }
 
-    public static void leaderIsDifferentThenKilled() {
-        if (currentLeader().isPresent()) {
-            Assert.assertNotEquals(killedClusterMemberOrdinal, currentLeader().get().getOrdinal());
-        } else {
-            Assert.fail("doesn't exist leader");
-        }
+    private static void shutdownActorSystem(int ordinal) {
+        ClusterObjectWrapper objectWrapper = CLUSTER_OBJECTS.get(ordinal);
+        Preconditions.checkNotNull(objectWrapper, "missing cluster object wrapper for ordinal "+ordinal);
+        ActorSystem actorSystem = objectWrapper.getActorSystem();
+        actorSystem.shutdown();
+        Awaitility.await()
+                .atMost(15, TimeUnit.SECONDS)
+                .until(actorSystem::isTerminated);
     }
 }
