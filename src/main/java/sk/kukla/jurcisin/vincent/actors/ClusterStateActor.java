@@ -8,6 +8,7 @@ import akka.cluster.ClusterEvent;
 import akka.japi.Creator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sk.kukla.jurcisin.vincent.MemberStatus;
 import sk.kukla.jurcisin.vincent.management.ClusterState;
 
 /**
@@ -41,25 +42,31 @@ public class ClusterStateActor extends UntypedActor {
 
     public void onReceive(final Object message) throws Throwable {
         if (message instanceof ClusterEvent.MemberJoined) {
-            LOG.info("[akka member: {}] ClusterEvent.MemberJoined", selfAddress);
+            LOG.info("[member: {}] ClusterEvent.MemberJoined", selfAddress);
+            clusterState.onClusterEvent(((ClusterEvent.MemberJoined) message).member().address(), MemberStatus.JOINED);
         } else if (message instanceof ClusterEvent.MemberRemoved) {
-            LOG.info("[akka member: {}] ClusterEvent.MemberRemoved", selfAddress);
+            LOG.info("[member: {}] ClusterEvent.MemberRemoved", selfAddress);
+            clusterState
+                    .onClusterEvent(((ClusterEvent.MemberRemoved) message).member().address(), MemberStatus.REMOVED);
         } else if (message instanceof ClusterEvent.UnreachableMember) {
-            LOG.info("[akka member: {}] ClusterEvent.UnreachableMember", selfAddress);
+            LOG.info("[member: {}] ClusterEvent.UnreachableMember", selfAddress);
+            clusterState.onClusterEvent(((ClusterEvent.UnreachableMember) message).member().address(),
+                    MemberStatus.UNREACHABLE);
         } else if (message instanceof ClusterEvent.MemberLeft) {
-            LOG.info("[akka member: {}] ClusterEvent.MemberLeft", selfAddress);
+            LOG.info("[member: {}] ClusterEvent.MemberLeft", selfAddress);
+            clusterState.onClusterEvent(((ClusterEvent.MemberLeft) message).member().address(), MemberStatus.LEFT);
         } else if (message instanceof ClusterEvent.MemberUp) {
-            LOG.info("[akka member: {}] ClusterEvent.MemberUp", selfAddress);
+            LOG.info("[member: {}] ClusterEvent.MemberUp", selfAddress);
+            clusterState.onClusterEvent(((ClusterEvent.MemberUp) message).member().address(), MemberStatus.UP);
         } else if (message instanceof ClusterEvent.CurrentClusterState) {
             ClusterEvent.CurrentClusterState clusterState = (ClusterEvent.CurrentClusterState) message;
-            LOG.info("[akka member: {}] ClusterEvent.CurrentClusterState: leader={}",
-                    selfAddress, clusterState.getLeader());
+            LOG.info("[cluster] ClusterEvent.CurrentClusterState: {}", clusterState);
         } else if (message instanceof ClusterEvent.LeaderChanged) {
             LOG.info("[akka member: {}] ClusterEvent.LeaderChanged, new leader: {}", selfAddress,
                     ((ClusterEvent.LeaderChanged) message).getLeader());
             clusterState.leaderChanged((ClusterEvent.LeaderChanged) message);
         } else {
-            LOG.warn("[akka member: {}] Unhandled message: {}", selfAddress, message);
+            LOG.warn("[member: {}] Unhandled message: {}", selfAddress, message);
             unhandled(message);
         }
     }

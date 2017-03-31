@@ -1,5 +1,6 @@
 package sk.kukla.jurcisin.vincent;
 
+import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Address;
 import akka.cluster.Cluster;
@@ -13,12 +14,15 @@ public class ClusterObjectWrapper {
     private final int ordinal;
     private final ActorSystem actorSystem;
     private final ClusterState clusterState;
+    private final ActorRef clusterStaterActor;
     private final Address address;
 
-    public ClusterObjectWrapper(final int ordinal, final ActorSystem actorSystem, final ClusterState clusterState) {
+    public ClusterObjectWrapper(final int ordinal, final ActorSystem actorSystem, final ClusterState clusterState,
+            ActorRef clusterStaterActor) {
         this.ordinal = ordinal;
         this.actorSystem = actorSystem;
         this.clusterState = clusterState;
+        this.clusterStaterActor = clusterStaterActor;
         this.address = Cluster.get(actorSystem).selfAddress();
     }
 
@@ -38,13 +42,16 @@ public class ClusterObjectWrapper {
         return address;
     }
 
+    public ActorRef getClusterStaterActor() {
+        return clusterStaterActor;
+    }
+
     @Override
     public String toString() {
         return "ClusterObjectWrapper{" +
                 "ordinal=" + ordinal +
-                ", actorSystem=" + actorSystem +
-                ", clusterState=" + clusterState +
                 ", address=" + address +
+                ", clusterState=" + clusterState +
                 '}';
     }
 }

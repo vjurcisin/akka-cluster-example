@@ -17,6 +17,7 @@ public class ClusterTests {
 
     @After
     public void tearDown() throws Exception {
+        TestUtils.printOverview();
         TestUtils.stopCluster();
     }
 
@@ -51,18 +52,4 @@ public class ClusterTests {
         TestUtils.startupStoppedMember();
         TestUtils.waitForLeaders(1, 15);
     }
-
-//    private static void startup(String[] ports) {
-//        for (String port : ports) {
-//            // Override the configuration of the port
-//            Config config = ConfigFactory.parseString("akka.remote.netty.tcp.port=" + port)
-//                    .withFallback(ConfigFactory.load());
-//            // Create an Akka system
-//            ActorSystem system = ActorSystem.create("ClusterSystem", config);
-//            ActorRef pingActor = system.actorOf(Props.create(PingActor.class), "PingActor");
-//            ActorRef pongActor = system.actorOf(Props.create(PongActor.class), "PongActor");
-//            system.actorOf(Props.create(SimpleActor.class), "SimpleActor");
-//            pingActor.tell(new PingMessage(), pongActor);
-//        }
-//    }
 }
